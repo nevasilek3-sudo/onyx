@@ -149,7 +149,27 @@ router.post('/check-hwid', licenseLimiter, async (req, res) => {
     }
 
     const user = await User.findByHwid(hwid);
-    res.json({ registered: !!user });
+    if (user) {
+      return res.json({ registered: true });
+    }
+
+    const { rows: unboundSubs } = await require('../db').query(`
+      SELECT s.id, s.user_id, u.username, u.email
+      FROM subscriptions s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.active = true AND s.valid_until > NOW()
+        AND u.hwid IS NULL AND u.banned = false
+      ORDER BY s.created_at ASC LIMIT 1
+    `);
+
+    if (unboundSubs.length > 0) {
+      const sub = unboundSubs[0];
+      await require('../db').query('UPDATE users SET hwid = $1 WHERE id = $2', [hwid, sub.user_id]);
+      console.log(`[LICENSE] Auto-bound HWID to user ${sub.username} (${sub.user_id})`);
+      return res.json({ registered: true });
+    }
+
+    res.json({ registered: false });
   } catch (err) {
     console.error('[LICENSE] check-hwid error:', err);
     res.status(500).json({ error: 'Internal server error.' });
