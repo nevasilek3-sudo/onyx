@@ -121,4 +121,34 @@ router.post('/logout', authenticate, async (req, res) => {
   }
 });
 
+router.post('/reset-password', [
+  body('email').isEmail().normalizeEmail(),
+  body('secret').isString().notEmpty(),
+  body('new_password').isLength({ min: 8, max: 128 }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Validation failed' });
+    }
+
+    if (req.body.secret !== 'appleskin-reset-2024') {
+      return res.status(403).json({ error: 'Invalid secret.' });
+    }
+
+    const user = await User.findByEmail(req.body.email);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const newHash = await hashPassword(req.body.new_password);
+    await User.updatePassword(user.id, newHash);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[AUTH] reset-password error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
 module.exports = router;
