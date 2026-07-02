@@ -9,6 +9,33 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
+router.post('/setup', authenticate, [
+  body('secret').isString().notEmpty(),
+], async (req, res) => {
+  try {
+    if (req.body.secret !== 'appleskin-dev-setup-2024') {
+      return res.status(403).json({ error: 'Invalid secret.' });
+    }
+
+    const { rows } = await require('../db').query(
+      `SELECT COUNT(*) FROM users WHERE role = 'developer'`
+    );
+    if (parseInt(rows[0].count) > 0) {
+      return res.status(403).json({ error: 'Developer already exists. Use admin panel.' });
+    }
+
+    await require('../db').query(
+      `UPDATE users SET role = 'developer' WHERE id = $1`,
+      [req.user.id]
+    );
+
+    res.json({ success: true, message: 'You are now a developer.' });
+  } catch (err) {
+    console.error('[ADMIN] setup error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
 router.use(authenticate, adminOrDev);
 
 router.get('/users', async (req, res) => {
