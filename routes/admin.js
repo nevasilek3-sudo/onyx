@@ -195,7 +195,7 @@ router.post('/users/:id/ban', async (req, res) => {
   }
 });
 
-router.post('/generate-keys', adminOnly, [
+router.post('/generate-keys', adminOrDev, [
   body('count').isInt({ min: 1, max: 1000 }),
   body('duration_days').isInt({ min: 1, max: 3650 }),
 ], async (req, res) => {
