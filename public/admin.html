@@ -96,206 +96,9 @@
 
   <script>
     const token = localStorage.getItem('token');
-    if (!token) { window.location.href = '/login'; return; }
-
-    (async () => {
-      try {
-        const res = await fetch('/api/user/profile', {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const data = await res.json();
-        if (!res.ok || (data.role !== 'admin' && data.role !== 'developer')) {
-          window.location.href = '/dashboard';
-          return;
-        }
-        document.getElementById('userBadge').textContent = data.username;
-        loadStats();
-        loadUsers();
-        loadJarInfo();
-      } catch (e) {
-        window.location.href = '/dashboard';
-      }
-    })();
-
-    async function loadJarInfo() {
-      try {
-        const res = await fetch('/api/client/jar-info', {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const data = await res.json();
-        const el = document.getElementById('jarInfo');
-        if (data.exists) {
-          el.textContent = 'Current JAR: ' + (data.size / 1024 / 1024).toFixed(1) + ' MB';
-        } else {
-          el.textContent = 'No JAR uploaded yet.';
-        }
-      } catch (e) {}
-    }
-
-    async function uploadJar() {
-      const file = document.getElementById('jarInput').files[0];
-      if (!file) { showError('Select a JAR file first.'); return; }
-      if (!file.name.endsWith('.jar')) { showError('File must be .jar'); return; }
-
-      const formData = new FormData();
-      formData.append('jar', file);
-
-      try {
-        const res = await fetch('/api/client/upload-jar', {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + token },
-          body: formData,
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Upload failed');
-        showSuccess('JAR uploaded successfully!');
-        loadJarInfo();
-      } catch (err) { showError(err.message); }
-    }
+    if (!token) { window.location.href = '/login'; }
 
     let currentPage = 1;
-    let currentUser = null;
-
-    async function api(path, opts = {}) {
-      opts.headers = { ...opts.headers, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
-      const res = await fetch(path, opts);
-      if (res.status === 401 || res.status === 403) {
-        const d = await res.json();
-        if (res.status === 403) { showError(d.error || 'No permission'); return null; }
-        localStorage.clear(); window.location.href = '/login'; return null;
-      }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Request failed');
-      return data;
-    }
-
-    async function loadStats() {
-      try {
-        const d = await api('/api/admin/stats');
-        if (!d) return;
-        document.getElementById('statUsers').textContent = d.total_users;
-        document.getElementById('statActive').textContent = d.active_subs;
-        document.getElementById('statUsedKeys').textContent = d.total_keys_used;
-        document.getElementById('statToday').textContent = d.users_today;
-      } catch (err) { showError(err.message); }
-    }
-
-    async function loadUsers(page = 1) {
-      currentPage = page;
-      try {
-        const search = document.getElementById('searchInput').value;
-        const role = document.getElementById('roleFilter').value;
-        const params = new URLSearchParams({ page, limit: 20 });
-        if (search) params.set('search', search);
-        if (role) params.set('role', role);
-        const d = await api('/api/admin/users?' + params);
-        if (!d) return;
-
-        const tbody = document.getElementById('usersTable');
-        tbody.innerHTML = '';
-        d.users.forEach(u => {
-          const tr = document.createElement('tr');
-          const roleBadge = `badge-${u.role === 'prem-user' ? 'prem' : u.role === 'developer' ? 'dev' : u.role}`;
-          tr.innerHTML = `
-            <td>${u.username}</td>
-            <td style="font-size:0.85rem;">${u.email}</td>
-            <td><span class="badge ${roleBadge}">${u.role}</span></td>
-            <td style="font-family:monospace;font-size:0.8rem;">${u.hwid ? u.hwid.substring(0, 16) + '...' : '-'}</td>
-            <td style="font-size:0.85rem;">${new Date(u.created_at).toLocaleDateString()}</td>
-            <td>
-              <button class="btn btn-sm btn-outline" onclick="showUser('${u.id}')">Manage</button>
-              <button class="btn btn-sm ${u.banned ? 'btn-success' : 'btn-danger'}" onclick="toggleBan('${u.id}')">
-                ${u.banned ? 'Unban' : 'Ban'}
-              </button>
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-        const totalPages = Math.ceil(d.total / d.limit);
-        const pag = document.getElementById('pagination');
-        pag.innerHTML = '';
-        for (let i = 1; i <= totalPages && i <= 10; i++) {
-          const btn = document.createElement('button');
-          btn.textContent = i;
-          btn.onclick = () => loadUsers(i);
-          if (i === page) btn.style.borderColor = 'var(--accent)';
-          pag.appendChild(btn);
-        }
-      } catch (err) { showError(err.message); }
-    }
-
-    function searchUsers() { loadUsers(1); }
-
-    async function showUser(id) {
-      const pwd = prompt('Enter your password for admin action:');
-      if (!pwd) return;
-      const action = prompt(
-        'Actions:\n 1 - Give sub\n 2 - Revoke sub\n 3 - Change role\n 4 - Reset HWID\nEnter number:'
-      );
-      if (!action) return;
-
-      try {
-        switch (action) {
-          case '1': {
-            const days = prompt('Duration in days:');
-            if (!days) return;
-            await api(`/api/admin/users/${id}/give-sub`, {
-              method: 'POST', body: JSON.stringify({ duration_days: parseInt(days) })
-            });
-            showSuccess('Subscription given.');
-            break;
-          }
-          case '2':
-            await api(`/api/admin/users/${id}/revoke-sub`, { method: 'POST' });
-            showSuccess('Subscription revoked.');
-            break;
-          case '3': {
-            const role = prompt('New role (user, prem-user, media, admin, developer):');
-            if (!role) return;
-            await api(`/api/admin/users/${id}/change-role`, {
-              method: 'POST', body: JSON.stringify({ role })
-            });
-            showSuccess('Role changed.');
-            break;
-          }
-          case '4':
-            await api(`/api/admin/users/${id}/reset-hwid`, { method: 'POST' });
-            showSuccess('HWID reset.');
-            break;
-        }
-        loadUsers(currentPage);
-      } catch (err) { showError(err.message); }
-    }
-
-    async function toggleBan(id) {
-      try {
-        await api(`/api/admin/users/${id}/ban`, { method: 'POST' });
-        showSuccess('Done.');
-        loadUsers(currentPage);
-      } catch (err) { showError(err.message); }
-    }
-
-    async function generateKeys() {
-      const count = parseInt(document.getElementById('keyCount').value);
-      const duration = parseInt(document.getElementById('keyDuration').value);
-      if (count < 1 || duration < 1) { showError('Invalid values.'); return; }
-      try {
-        const d = await api('/api/admin/generate-keys', {
-          method: 'POST', body: JSON.stringify({ count, duration_days: duration })
-        });
-        if (!d) return;
-        document.getElementById('keysText').value = d.keys.join('\n');
-        document.getElementById('keysOutput').style.display = 'block';
-        showSuccess(`Generated ${d.keys.length} keys.`);
-      } catch (err) { showError(err.message); }
-    }
-
-    function copyKeys() {
-      const ta = document.getElementById('keysText');
-      ta.select(); navigator.clipboard.writeText(ta.value);
-      showSuccess('Copied!');
-    }
 
     function showError(msg) {
       const el = document.getElementById('error');
@@ -309,11 +112,152 @@
       setTimeout(() => el.style.display = 'none', 5000);
     }
 
-    function logout() {
-      fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } })
-        .catch(() => {}).finally(() => { localStorage.clear(); window.location.href = '/login'; });
+    async function api(path, opts = {}) {
+      opts.headers = { ...opts.headers, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+      const res = await fetch(path, opts);
+      if (res.status === 401) { localStorage.clear(); window.location.href = '/login'; return null; }
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Request failed'); return null; }
+      return data;
     }
 
+    async function init() {
+      try {
+        const data = await api('/api/user/profile');
+        if (!data || (data.role !== 'admin' && data.role !== 'developer')) {
+          window.location.href = '/dashboard';
+          return;
+        }
+        document.getElementById('userBadge').textContent = data.username;
+        loadStats();
+        loadUsers();
+        loadJarInfo();
+      } catch (e) {
+        window.location.href = '/dashboard';
+      }
+    }
+
+    async function loadStats() {
+      const d = await api('/api/admin/stats');
+      if (!d) return;
+      document.getElementById('statUsers').textContent = d.total_users;
+      document.getElementById('statActive').textContent = d.active_subs;
+      document.getElementById('statUsedKeys').textContent = d.total_keys_used;
+      document.getElementById('statToday').textContent = d.users_today;
+    }
+
+    async function loadUsers(page) {
+      if (page) currentPage = page;
+      const search = document.getElementById('searchInput').value;
+      const role = document.getElementById('roleFilter').value;
+      const params = new URLSearchParams({ page: currentPage, limit: 20 });
+      if (search) params.set('search', search);
+      if (role) params.set('role', role);
+      const d = await api('/api/admin/users?' + params);
+      if (!d) return;
+
+      const tbody = document.getElementById('usersTable');
+      tbody.innerHTML = '';
+      d.users.forEach(function(u) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + u.username + '</td>' +
+          '<td style="font-size:0.85rem;">' + u.email + '</td>' +
+          '<td><span class="badge badge-' + (u.role === 'developer' ? 'dev' : u.role) + '">' + u.role + '</span></td>' +
+          '<td style="font-family:monospace;font-size:0.8rem;">' + (u.hwid ? u.hwid.substring(0, 16) + '...' : '-') + '</td>' +
+          '<td style="font-size:0.85rem;">' + new Date(u.created_at).toLocaleDateString() + '</td>' +
+          '<td><button class="btn btn-sm btn-outline" onclick="showUser(\'' + u.id + '\')">Manage</button> ' +
+          '<button class="btn btn-sm ' + (u.banned ? 'btn-success' : 'btn-danger') + '" onclick="toggleBan(\'' + u.id + '\')">' + (u.banned ? 'Unban' : 'Ban') + '</button></td>';
+        tbody.appendChild(tr);
+      });
+
+      var totalPages = Math.ceil(d.total / d.limit);
+      var pag = document.getElementById('pagination');
+      pag.innerHTML = '';
+      for (var i = 1; i <= totalPages && i <= 10; i++) {
+        var btn = document.createElement('button');
+        btn.textContent = i;
+        btn.onclick = (function(page) { return function() { loadUsers(page); }; })(i);
+        if (i === currentPage) btn.style.borderColor = 'var(--accent)';
+        pag.appendChild(btn);
+      }
+    }
+
+    function searchUsers() { loadUsers(1); }
+
+    function showUser(id) {
+      var action = prompt('Actions:\n 1 - Give sub\n 2 - Revoke sub\n 3 - Change role\n 4 - Reset HWID\nEnter number:');
+      if (!action) return;
+      if (action === '1') {
+        var days = prompt('Duration in days:');
+        if (!days) return;
+        api('/api/admin/users/' + id + '/give-sub', { method: 'POST', body: JSON.stringify({ duration_days: parseInt(days) }) })
+          .then(function() { showSuccess('Subscription given.'); loadUsers(); });
+      } else if (action === '2') {
+        api('/api/admin/users/' + id + '/revoke-sub', { method: 'POST' })
+          .then(function() { showSuccess('Subscription revoked.'); loadUsers(); });
+      } else if (action === '3') {
+        var role = prompt('New role (user, prem-user, media, admin, developer):');
+        if (!role) return;
+        api('/api/admin/users/' + id + '/change-role', { method: 'POST', body: JSON.stringify({ role: role }) })
+          .then(function() { showSuccess('Role changed.'); loadUsers(); });
+      } else if (action === '4') {
+        api('/api/admin/users/' + id + '/reset-hwid', { method: 'POST' })
+          .then(function() { showSuccess('HWID reset.'); loadUsers(); });
+      }
+    }
+
+    function toggleBan(id) {
+      api('/api/admin/users/' + id + '/ban', { method: 'POST' })
+        .then(function() { showSuccess('Done.'); loadUsers(); });
+    }
+
+    async function generateKeys() {
+      var count = parseInt(document.getElementById('keyCount').value);
+      var duration = parseInt(document.getElementById('keyDuration').value);
+      if (count < 1 || duration < 1) { showError('Invalid values.'); return; }
+      var d = await api('/api/admin/generate-keys', {
+        method: 'POST', body: JSON.stringify({ count: count, duration_days: duration })
+      });
+      if (!d) return;
+      document.getElementById('keysText').value = d.keys.join('\n');
+      document.getElementById('keysOutput').style.display = 'block';
+      showSuccess('Generated ' + d.keys.length + ' keys.');
+    }
+
+    function copyKeys() {
+      var ta = document.getElementById('keysText');
+      ta.select();
+      navigator.clipboard.writeText(ta.value);
+      showSuccess('Copied!');
+    }
+
+    async function loadJarInfo() {
+      var res = await fetch('/api/client/jar-info', { headers: { 'Authorization': 'Bearer ' + token } });
+      var data = await res.json();
+      var el = document.getElementById('jarInfo');
+      el.textContent = data.exists ? 'Current JAR: ' + (data.size / 1024 / 1024).toFixed(1) + ' MB' : 'No JAR uploaded yet.';
+    }
+
+    async function uploadJar() {
+      var file = document.getElementById('jarInput').files[0];
+      if (!file) { showError('Select a JAR file first.'); return; }
+      var formData = new FormData();
+      formData.append('jar', file);
+      var res = await fetch('/api/client/upload-jar', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData
+      });
+      var data = await res.json();
+      if (!res.ok) { showError(data.error || 'Upload failed'); return; }
+      showSuccess('JAR uploaded!');
+      loadJarInfo();
+    }
+
+    function logout() {
+      fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } })
+        .catch(function() {}).finally(function() { localStorage.clear(); window.location.href = '/login'; });
+    }
+
+    init();
   </script>
 </body>
 </html>
