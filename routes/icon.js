@@ -9,6 +9,32 @@ const router = express.Router();
 const MAX_ICON_SIZE = 256 * 1024;
 const DEFAULT_ICON = path.resolve(__dirname, '..', 'uploads', 'default_icon.png');
 
+router.get('/user/:id', async (req, res) => {
+  try {
+    const result = await query(
+      'SELECT icon_data, mime_type FROM user_icons WHERE user_id = $1 AND selected = true',
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      if (fs.existsSync(DEFAULT_ICON)) {
+        const defaultData = fs.readFileSync(DEFAULT_ICON, 'base64');
+        return res.json({ icon: defaultData, mime_type: 'image/png', is_default: true });
+      }
+      return res.json({ icon: null });
+    }
+
+    res.json({
+      icon: result.rows[0].icon_data,
+      mime_type: result.rows[0].mime_type,
+      is_default: false,
+    });
+  } catch (err) {
+    console.error('[ICON] get error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
 router.use(authenticate);
 
 router.post('/upload', [
