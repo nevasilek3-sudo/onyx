@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - AppleSkin</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="/" class="header-logo">AppleSkin</a>
+      <div class="header-nav">
+        <span id="userBadge" style="font-size:0.9rem;color:var(--text-secondary);"></span>
+        <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div id="error" class="alert alert-error" style="display:none;"></div>
+    <div id="success" class="alert alert-success" style="display:none;"></div>
+
+    <div class="card">
+      <h2>Profile</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><strong>Username:</strong> <span id="profileUsername">-</span></div>
+        <div><strong>Role:</strong> <span id="profileRole">-</span></div>
+        <div><strong>Email:</strong> <span id="profileEmail">-</span></div>
+        <div><strong>Subscription:</strong> <span id="profileSub">-</span></div>
+        <div><strong>HWID:</strong> <span id="profileHwid" style="font-family:monospace;font-size:0.85rem;">-</span></div>
+        <div><strong>Registered:</strong> <span id="profileCreated">-</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Actions</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        <button class="btn btn-primary" onclick="downloadJar()">Download JAR</button>
+        <button class="btn btn-danger" onclick="resetHwid()">Reset HWID</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Your Icon</h2>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:12px;">
+        Upload an icon that will be displayed on your player in-game.
+      </p>
+      <div id="iconPreview" style="margin-bottom:12px;display:none;">
+        <img id="currentIcon" class="icon-preview" alt="Current icon">
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="file" id="iconInput" accept="image/png,image/jpeg,image/gif" style="display:none;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('iconInput').click()">Choose File</button>
+        <button class="btn btn-primary btn-sm" onclick="uploadIcon()">Upload</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteIcon()">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/login'; return; }
+
+    async function api(path, opts = {}) {
+      opts.headers = { ...opts.headers, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+      const res = await fetch(path, opts);
+      if (res.status === 401) { localStorage.clear(); window.location.href = '/login'; return null; }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    async function loadProfile() {
+      try {
+        const data = await api('/api/user/profile');
+        document.getElementById('profileUsername').textContent = data.username;
+        document.getElementById('profileRole').innerHTML = `<span class="badge badge-${data.role === 'prem-user' ? 'prem' : data.role === 'admin' || data.role === 'developer' ? 'dev' : data.role}">${data.role}</span>`;
+        document.getElementById('profileEmail').textContent = data.email;
+        document.getElementById('profileHwid').textContent = data.hwid || 'Not set';
+        document.getElementById('profileCreated').textContent = new Date(data.created_at).toLocaleDateString();
+        document.getElementById('profileSub').textContent = data.sub_until
+          ? `Active until ${new Date(data.sub_until).toLocaleDateString()}`
+          : 'No active subscription';
+        document.getElementById('userBadge').textContent = data.username;
+        loadIcon();
+      } catch (err) { showError(err.message); }
+    }
+
+    async function loadIcon() {
+      try {
+        const data = await api('/api/icon/get');
+        if (data.icon) {
+          document.getElementById('currentIcon').src = 'data:' + data.mime_type + ';base64,' + data.icon;
+          document.getElementById('iconPreview').style.display = 'block';
+        }
+      } catch {}
+    }
+
+    async function uploadIcon() {
+      const file = document.getElementById('iconInput').files[0];
+      if (!file) { showError('Select a file first.'); return; }
+      if (file.size > 256 * 1024) { showError('File too large (max 256KB).'); return; }
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result.split(',')[1];
+        try {
+          await api('/api/icon/upload', {
+            method: 'POST',
+            body: JSON.stringify({ icon_data: base64, mime_type: file.type }),
+          });
+          showSuccess('Icon uploaded!');
+          loadIcon();
+        } catch (err) { showError(err.message); }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function deleteIcon() {
+      try {
+        await api('/api/icon/delete', { method: 'DELETE' });
+        document.getElementById('iconPreview').style.display = 'none';
+        showSuccess('Icon removed.');
+      } catch (err) { showError(err.message); }
+    }
+
+    async function downloadJar() {
+      try {
+        const res = await fetch('/api/client/download', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Download failed'); }
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'appleskin.jar';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (err) { showError(err.message); }
+    }
+
+    async function resetHwid() {
+      const pwd = prompt('Enter your password to reset HWID:');
+      if (!pwd) return;
+      try {
+        await api('/api/user/reset-hwid', {
+          method: 'POST',
+          body: JSON.stringify({ password: pwd }),
+        });
+        showSuccess('HWID reset! Your subscription has been deactivated. Re-activate with your license key.');
+        loadProfile();
+      } catch (err) { showError(err.message); }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg; el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 5000);
+    }
+
+    function showSuccess(msg) {
+      const el = document.getElementById('success');
+      el.textContent = msg; el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 5000);
+    }
+
+    function logout() {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).catch(() => {}).finally(() => {
+        localStorage.clear();
+        window.location.href = '/login';
+      });
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
