@@ -9,6 +9,7 @@ const Session = require('./models/Session');
 const { setupWebSocket, getOnlineUsers } = require('./websocket');
 const { authenticate } = require('./middleware/auth');
 const { query } = require('./db');
+const fileUpload = require('express-fileupload');
 
 const authRoutes = require('./routes/auth');
 const licenseRoutes = require('./routes/license');
@@ -85,6 +86,7 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '1mb' }));
+app.use(fileUpload({ limits: { fileSize: 50 * 1024 * 1024 } }));
 app.use(globalLimiter);
 
 app.use(express.static(path.join(__dirname, 'public')));

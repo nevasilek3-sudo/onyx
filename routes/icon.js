@@ -2,9 +2,12 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { query } = require('../db');
 const { authenticate } = require('../middleware/auth');
+const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
 const MAX_ICON_SIZE = 256 * 1024;
+const DEFAULT_ICON = path.resolve(__dirname, '..', 'uploads', 'default_icon.png');
 
 router.use(authenticate);
 
@@ -53,7 +56,10 @@ router.get('/download', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'No icon selected.' });
+      if (fs.existsSync(DEFAULT_ICON)) {
+        return res.sendFile(DEFAULT_ICON);
+      }
+      return res.status(404).json({ error: 'No icon found.' });
     }
 
     const { icon_data, mime_type } = result.rows[0];
@@ -77,12 +83,17 @@ router.get('/get', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      if (fs.existsSync(DEFAULT_ICON)) {
+        const defaultData = fs.readFileSync(DEFAULT_ICON, 'base64');
+        return res.json({ icon: defaultData, mime_type: 'image/png', is_default: true });
+      }
       return res.json({ icon: null });
     }
 
     res.json({
       icon: result.rows[0].icon_data,
       mime_type: result.rows[0].mime_type,
+      is_default: false,
     });
   } catch (err) {
     console.error('[ICON] get error:', err);

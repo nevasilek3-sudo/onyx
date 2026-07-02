@@ -31,6 +31,19 @@
     </div>
 
     <div class="card">
+      <h2>JAR Management</h2>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:12px;">
+        Upload a new JAR file for users to download.
+      </p>
+      <div id="jarInfo" style="margin-bottom:12px;color:var(--text-secondary);font-size:0.9rem;"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <input type="file" id="jarInput" accept=".jar" style="display:none;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('jarInput').click()">Choose JAR</button>
+        <button class="btn btn-success btn-sm" onclick="uploadJar()">Upload</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Generate License Keys</h2>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
         <div class="form-group" style="flex:1;min-width:120px;">
@@ -98,10 +111,47 @@
         document.getElementById('userBadge').textContent = data.username;
         loadStats();
         loadUsers();
+        loadJarInfo();
       } catch (e) {
         window.location.href = '/dashboard';
       }
     })();
+
+    async function loadJarInfo() {
+      try {
+        const res = await fetch('/api/client/jar-info', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        const el = document.getElementById('jarInfo');
+        if (data.exists) {
+          el.textContent = 'Current JAR: ' + (data.size / 1024 / 1024).toFixed(1) + ' MB';
+        } else {
+          el.textContent = 'No JAR uploaded yet.';
+        }
+      } catch (e) {}
+    }
+
+    async function uploadJar() {
+      const file = document.getElementById('jarInput').files[0];
+      if (!file) { showError('Select a JAR file first.'); return; }
+      if (!file.name.endsWith('.jar')) { showError('File must be .jar'); return; }
+
+      const formData = new FormData();
+      formData.append('jar', file);
+
+      try {
+        const res = await fetch('/api/client/upload-jar', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        showSuccess('JAR uploaded successfully!');
+        loadJarInfo();
+      } catch (err) { showError(err.message); }
+    }
 
     let currentPage = 1;
     let currentUser = null;

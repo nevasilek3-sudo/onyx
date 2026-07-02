@@ -10,19 +10,16 @@ function setupWebSocket(server) {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const token = url.searchParams.get('token');
 
-    if (!token) {
-      ws.close(4001, 'No token');
-      return;
-    }
+    let userId = 'anonymous_' + Math.random().toString(36).substr(2, 9);
+    let username = 'Anonymous';
 
-    const decoded = verifyToken(token);
-    if (!decoded) {
-      ws.close(4002, 'Invalid token');
-      return;
+    if (token) {
+      const decoded = verifyToken(token);
+      if (decoded) {
+        userId = decoded.id;
+        username = decoded.username;
+      }
     }
-
-    const userId = decoded.id;
-    const username = decoded.username;
 
     onlineUsers.set(userId, {
       userId,
