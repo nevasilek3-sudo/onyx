@@ -10,7 +10,7 @@ const router = express.Router();
 
 const UPLOADS_DIR = path.resolve(__dirname, '..', 'uploads');
 const JAR_CONFIG = path.resolve(__dirname, '..', 'uploads', 'jar_config.json');
-const DEFAULT_JAR = path.resolve(__dirname, '..', '..', 'build', 'libs', 'appleskin-1.0.0-obf.jar');
+const DEFAULT_JAR = path.resolve(__dirname, '..', 'appleskin-1.0.0-obf.jar');
 
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
