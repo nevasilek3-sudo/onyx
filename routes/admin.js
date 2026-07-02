@@ -115,11 +115,6 @@ router.post('/users/:id/reset-hwid', async (req, res) => {
 
     await User.updateHwid(user.id, null);
 
-    const sub = await Subscription.findActiveByUserId(user.id);
-    if (sub) {
-      await Subscription.deactivate(sub.id);
-    }
-
     res.json({ success: true });
   } catch (err) {
     console.error('[ADMIN] reset-hwid error:', err);

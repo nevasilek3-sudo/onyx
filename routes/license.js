@@ -113,20 +113,20 @@ router.post('/check', licenseLimiter, async (req, res) => {
   }
 });
 
-router.post('/ping', authenticate, async (req, res) => {
+router.post('/ping', licenseLimiter, async (req, res) => {
   try {
     const { hwid } = req.body;
-    const user = await User.findByIdFull(req.user.id);
+    if (!hwid || hwid.length < 8) {
+      return res.json({ valid: false, reason: 'invalid_hwid' });
+    }
+
+    const user = await User.findByHwid(hwid);
     if (!user) {
-      return res.json({ valid: false, reason: 'user_not_found' });
+      return res.json({ valid: false, reason: 'hwid_not_found' });
     }
 
     if (user.banned) {
       return res.json({ valid: false, reason: 'banned' });
-    }
-
-    if (user.hwid && user.hwid !== hwid) {
-      return res.json({ valid: false, reason: 'hwid_mismatch' });
     }
 
     const sub = await Subscription.findActiveByUserId(user.id);

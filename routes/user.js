@@ -4,7 +4,6 @@ const User = require('../models/User');
 const Subscription = require('../models/Subscription');
 const { hashPassword, comparePassword } = require('../utils/hash');
 const { authenticate } = require('../middleware/auth');
-const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -55,15 +54,9 @@ router.post('/reset-hwid', authenticate, [
       return res.status(401).json({ error: 'Invalid password.' });
     }
 
-    const newHwid = crypto.randomBytes(32).toString('hex');
-    await User.updateHwid(user.id, newHwid);
+    await User.updateHwid(user.id, null);
 
-    const sub = await Subscription.findActiveByUserId(user.id);
-    if (sub) {
-      await Subscription.deactivate(sub.id);
-    }
-
-    res.json({ success: true, new_hwid: newHwid });
+    res.json({ success: true });
   } catch (err) {
     console.error('[USER] reset-hwid error:', err);
     res.status(500).json({ error: 'Internal server error.' });
