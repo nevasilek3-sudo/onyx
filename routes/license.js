@@ -150,7 +150,14 @@ router.post('/check-hwid', licenseLimiter, async (req, res) => {
 
     const user = await User.findByHwid(hwid);
     if (user) {
-      return res.json({ registered: true });
+      const sub = await Subscription.findActiveByUserId(user.id);
+      return res.json({
+        registered: true,
+        username: user.username,
+        uid: user.id,
+        role: user.role,
+        sub_until: sub ? new Date(sub.valid_until).getTime() : null
+      });
     }
 
     const { rows: unboundSubs } = await require('../db').query(`
