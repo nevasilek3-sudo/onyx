@@ -113,15 +113,14 @@ router.post('/users/:id/reset-hwid', async (req, res) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    const newHwid = crypto.randomBytes(32).toString('hex');
-    await User.updateHwid(user.id, newHwid);
+    await User.updateHwid(user.id, null);
 
     const sub = await Subscription.findActiveByUserId(user.id);
     if (sub) {
       await Subscription.deactivate(sub.id);
     }
 
-    res.json({ success: true, new_hwid: newHwid });
+    res.json({ success: true });
   } catch (err) {
     console.error('[ADMIN] reset-hwid error:', err);
     res.status(500).json({ error: 'Internal server error.' });
