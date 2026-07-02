@@ -19,7 +19,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://onyxdlc.xyz
+        value: https://onyx-ygac.onrender.com
       - key: JWT_EXPIRES_IN
         value: 1h
       - key: JWT_REFRESH_EXPIRES_IN
