@@ -16,7 +16,7 @@ router.get('/download', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    if (user.role === 'admin' || user.role === 'developer') {
+    if (user.role === 'admin' || user.role === 'developer' || user.role === 'media') {
       return sendJar(res);
     }
 

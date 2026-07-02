@@ -85,6 +85,24 @@
     const token = localStorage.getItem('token');
     if (!token) { window.location.href = '/login'; return; }
 
+    (async () => {
+      try {
+        const res = await fetch('/api/user/profile', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (!res.ok || (data.role !== 'admin' && data.role !== 'developer')) {
+          window.location.href = '/dashboard';
+          return;
+        }
+        document.getElementById('userBadge').textContent = data.username;
+        loadStats();
+        loadUsers();
+      } catch (e) {
+        window.location.href = '/dashboard';
+      }
+    })();
+
     let currentPage = 1;
     let currentUser = null;
 
@@ -246,8 +264,6 @@
         .catch(() => {}).finally(() => { localStorage.clear(); window.location.href = '/login'; });
     }
 
-    loadStats();
-    loadUsers();
   </script>
 </body>
 </html>

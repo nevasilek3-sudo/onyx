@@ -31,15 +31,18 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="actionsCard" style="display:none;">
       <h2>Actions</h2>
       <div style="display:flex;flex-wrap:wrap;gap:10px;">
-        <button class="btn btn-primary" onclick="downloadJar()">Download JAR</button>
-        <button class="btn btn-danger" onclick="resetHwid()">Reset HWID</button>
+        <button class="btn btn-primary" onclick="downloadJar()" id="downloadBtn" disabled>Download JAR</button>
+        <button class="btn btn-danger" onclick="resetHwid()" id="resetHwidBtn" style="display:none;">Reset HWID</button>
       </div>
+      <p id="subWarning" style="color:var(--danger);font-size:0.85rem;margin-top:8px;display:none;">
+        You need an active subscription to download.
+      </p>
     </div>
 
-    <div class="card">
+    <div class="card" id="iconCard" style="display:none;">
       <h2>Your Icon</h2>
       <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:12px;">
         Upload an icon that will be displayed on your player in-game.
@@ -58,7 +61,7 @@
 
   <script>
     const token = localStorage.getItem('token');
-    if (!token) { window.location.href = '/login'; return; }
+    if (!token) { window.location.href = '/login'; }
 
     async function api(path, opts = {}) {
       opts.headers = { ...opts.headers, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -77,9 +80,27 @@
         document.getElementById('profileEmail').textContent = data.email;
         document.getElementById('profileHwid').textContent = data.hwid || 'Not set';
         document.getElementById('profileCreated').textContent = new Date(data.created_at).toLocaleDateString();
-        document.getElementById('profileSub').textContent = data.sub_until
-          ? `Active until ${new Date(data.sub_until).toLocaleDateString()}`
+        const hasSub = data.sub_until && new Date(data.sub_until) > new Date();
+        document.getElementById('profileSub').textContent = hasSub
+          ? 'Active until ' + new Date(data.sub_until).toLocaleDateString()
           : 'No active subscription';
+
+        document.getElementById('actionsCard').style.display = 'block';
+        document.getElementById('iconCard').style.display = 'block';
+
+        const isPrivileged = data.role === 'admin' || data.role === 'developer' || data.role === 'media';
+        if (hasSub || isPrivileged) {
+          document.getElementById('downloadBtn').disabled = false;
+          document.getElementById('subWarning').style.display = 'none';
+        } else {
+          document.getElementById('downloadBtn').disabled = true;
+          document.getElementById('subWarning').style.display = 'block';
+        }
+
+        if (data.role === 'admin' || data.role === 'developer') {
+          document.getElementById('resetHwidBtn').style.display = 'inline-flex';
+        }
+
         document.getElementById('userBadge').textContent = data.username;
         loadIcon();
       } catch (err) { showError(err.message); }

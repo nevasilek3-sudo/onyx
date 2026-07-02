@@ -1,6 +1,7 @@
 const { verifyToken } = require('../utils/jwt');
+const User = require('../models/User');
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No token provided.' });
@@ -12,7 +13,16 @@ function authenticate(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired token.' });
   }
 
-  req.user = decoded;
+  const user = await User.findById(decoded.id);
+  if (!user) {
+    return res.status(401).json({ error: 'User not found.' });
+  }
+
+  if (user.banned) {
+    return res.status(403).json({ error: 'Account is banned.' });
+  }
+
+  req.user = { ...decoded, role: user.role };
   next();
 }
 

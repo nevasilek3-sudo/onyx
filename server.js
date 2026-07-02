@@ -73,8 +73,8 @@ async function migrate() {
 const app = express();
 
 app.use(helmet({
-  contentSecurityPolicy: config.isDev ? false : undefined,
-  crossOriginResourcePolicy: { policy: 'same-site' },
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 app.use(cors({
