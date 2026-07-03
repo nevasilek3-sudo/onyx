@@ -27,9 +27,19 @@ const User = {
     return rows[0] || null;
   },
 
+  async findByUsername(username) {
+    const { rows } = await query('SELECT * FROM users WHERE username = $1', [username]);
+    return rows[0] || null;
+  },
+
   async findByHwid(hwid) {
     const { rows } = await query('SELECT * FROM users WHERE hwid = $1', [hwid]);
     return rows[0] || null;
+  },
+
+  async getHwid(id) {
+    const { rows } = await query('SELECT hwid FROM users WHERE id = $1', [id]);
+    return rows[0] ? rows[0].hwid : null;
   },
 
   async findByIdFull(id) {

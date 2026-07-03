@@ -1,0 +1,21 @@
+{
+	"shortClientName": "AppleSkin",
+	"clientName": "APPLESKIN",
+	"version": "1.21.4",
+	"supportEmail": "nevasilek3@outlook.com",
+	"url": "onyx-ygac.onrender.com",
+	"ajaxUrl": "/ajax/",
+	"turnStileSiteKey": "",
+	"clientColor": "#92a5d5",
+
+	"socials": {
+		"discord": "https://discord.gg/MHns4Wrg55",
+		"telegram": "https://t.me/onyxclient"
+	},
+
+	"media": {
+		"first": "https://www.youtube.com/embed/MmB9b5njVbA?si=47mhj_I7ZOz62Ona",
+		"two": "https://www.youtube.com/embed/MmB9b5njVbA?si=47mhj_I7ZOz62Ona",
+		"three": "https://www.youtube.com/embed/MmB9b5njVbA?si=47mhj_I7ZOz62Ona"
+  	}
+}
