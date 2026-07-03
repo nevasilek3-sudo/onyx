@@ -41,7 +41,7 @@ router.post('/users/auth/default', async (req, res) => {
     const { username, password } = req.query;
     if (!username || !password) return res.json({ authStatus: false, authMessage: 'Username and password required' });
 
-    const user = await User.findByUsername(username);
+    const user = await User.findByUsername(username) || await User.findByEmail(username);
     if (!user) return res.json({ authStatus: false, authMessage: 'Invalid credentials' });
 
     const valid = await comparePassword(password, user.password_hash);
