@@ -38,16 +38,16 @@ router.get('/statistic/getAll', async (req, res) => {
 
 router.post('/users/auth/default', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    const { username, password } = req.query;
+    if (!username || !password) return res.json({ data: { authStatus: false, authMessage: 'Username and password required' } });
 
-    const user = await User.findByEmail(email);
-    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    const user = await User.findByUsername(username);
+    if (!user) return res.json({ data: { authStatus: false, authMessage: 'Invalid credentials' } });
 
     const valid = await comparePassword(password, user.password_hash);
-    if (!valid) return res.status(400).json({ error: 'Invalid credentials' });
+    if (!valid) return res.json({ data: { authStatus: false, authMessage: 'Invalid credentials' } });
 
-    if (user.banned) return res.status(403).json({ error: 'Account is banned' });
+    if (user.banned) return res.json({ data: { authStatus: false, authMessage: 'Account is banned' } });
 
     req.session.userId = user.id;
     req.session.username = user.username;
@@ -58,72 +58,76 @@ router.post('/users/auth/default', async (req, res) => {
     await query('INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3)',
       [user.id, token, expiresAt]);
 
+    const sub = await Subscription.findActiveByUserId(user.id);
+
     res.json({
       data: {
+        authStatus: true,
+        authMessage: 'Login successful',
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        isEmailVerified: true,
+        role: user.role,
+        banned: user.banned,
         token,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          hwid: user.hwid,
-          banned: user.banned,
-        }
+        hwid: user.hwid,
+        subtill: sub ? sub.valid_until : null,
+        regdate: user.created_at,
       }
     });
   } catch (err) {
     console.error('[ONYX] login error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.json({ data: { authStatus: false, authMessage: 'Internal server error' } });
   }
 });
 
 router.post('/users/auth/session', async (req, res) => {
   try {
-    if (!req.session || !req.session.userId) {
-      return res.status(401).json({ error: 'No active session' });
-    }
+    const { token } = req.query;
+    if (!token) return res.json({ data: { authStatus: false, authMessage: 'No token provided' } });
 
-    const user = await User.findByIdFull(req.session.userId);
-    if (!user || user.banned) {
-      req.session.destroy();
-      return res.status(401).json({ error: 'Session invalid' });
-    }
+    const sessRes = await query('SELECT user_id, token FROM sessions WHERE token = $1 AND expires_at > NOW()', [token]);
+    if (sessRes.rows.length === 0) return res.json({ data: { authStatus: false, authMessage: 'Session expired or invalid' } });
 
-    req.session.username = user.username;
-    req.session.role = user.role;
+    const userId = sessRes.rows[0].user_id;
+    const user = await User.findByIdFull(userId);
+    if (!user || user.banned) return res.json({ data: { authStatus: false, authMessage: 'Session invalid' } });
 
     const sub = await Subscription.findActiveByUserId(user.id);
 
     res.json({
       data: {
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          hwid: user.hwid,
-          banned: user.banned,
-          sub_until: sub ? sub.valid_until : null,
-          created_at: user.created_at,
-        }
+        authStatus: true,
+        authMessage: 'Session active',
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        isEmailVerified: true,
+        role: user.role,
+        hwid: user.hwid,
+        banned: user.banned,
+        token: sessRes.rows[0].token,
+        subtill: sub ? sub.valid_until : null,
+        regdate: user.created_at,
       }
     });
   } catch (err) {
     console.error('[ONYX] session error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.json({ data: { authStatus: false, authMessage: 'Internal server error' } });
   }
 });
 
 router.post('/users/auth/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password) return res.status(400).json({ error: 'All fields required' });
+    const { username, email, password } = req.query;
+    if (!username || !email || !password) return res.json({ data: { authStatus: false, authMessage: 'All fields required' } });
 
     const existing = await User.findByEmail(email);
-    if (existing) return res.status(400).json({ error: 'Email already registered' });
+    if (existing) return res.json({ data: { authStatus: false, authMessage: 'Email already registered' } });
 
     const existingName = await User.findByUsername(username);
-    if (existingName) return res.status(400).json({ error: 'Username already taken' });
+    if (existingName) return res.json({ data: { authStatus: false, authMessage: 'Username already taken' } });
 
     const passwordHash = await hashPassword(password);
     const user = await User.create(username, email, passwordHash);
@@ -139,41 +143,52 @@ router.post('/users/auth/register', async (req, res) => {
 
     res.json({
       data: {
+        authStatus: true,
+        authMessage: 'Registration successful',
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        isEmailVerified: true,
+        role: user.role,
+        banned: false,
         token,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-        }
+        hwid: null,
+        subtill: null,
+        regdate: user.created_at,
       }
     });
   } catch (err) {
     console.error('[ONYX] register error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.json({ data: { authStatus: false, authMessage: 'Internal server error' } });
   }
 });
 
 router.post('/users/auth/resetPassword', async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email required' });
+    const { email, newPassword } = req.query;
+    if (!email) return res.json({ data: { message: 'Email required' } });
 
     const user = await User.findByEmail(email);
     if (!user) return res.json({ data: { message: 'If account exists, reset link sent' } });
 
-    const resetToken = generateToken({ id: user.id, purpose: 'reset' }, '1h');
-    console.log(`[ONYX] Password reset requested for ${email}, token: ${resetToken}`);
-    // In production, send email with reset link
+    if (newPassword) {
+      const passwordHash = await hashPassword(newPassword);
+      await User.updatePassword(user.id, passwordHash);
+    } else {
+      const resetToken = generateToken({ id: user.id, purpose: 'reset' }, '1h');
+      console.log(`[ONYX] Password reset requested for ${email}, token: ${resetToken}`);
+    }
 
-    res.json({ data: { message: 'If account exists, reset link sent' } });
+    res.json({ data: { message: 'Password updated successfully' } });
   } catch (err) {
     console.error('[ONYX] resetPassword error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.json({ data: { message: 'Internal server error' } });
   }
 });
 
-router.post('/users/auth/logout', (req, res) => {
+router.post('/users/auth/logout', async (req, res) => {
+  const { token } = req.query;
+  if (token) await query('DELETE FROM sessions WHERE token = $1', [token]);
   req.session.destroy();
   res.json({ data: { message: 'Logged out' } });
 });
