@@ -10,7 +10,6 @@ const { setupWebSocket, getOnlineUsers } = require('./websocket');
 const { authenticate } = require('./middleware/auth');
 const { query } = require('./db');
 const fileUpload = require('express-fileupload');
-const session = require('express-session');
 
 const authRoutes = require('./routes/auth');
 const licenseRoutes = require('./routes/license');
@@ -18,7 +17,6 @@ const userRoutes = require('./routes/user');
 const adminRoutes = require('./routes/admin');
 const downloadRoutes = require('./routes/downloads');
 const iconRoutes = require('./routes/icon');
-const onyxRoutes = require('./routes/onyx');
 
 async function migrate() {
   try {
@@ -91,19 +89,6 @@ app.use(express.json({ limit: '1mb' }));
 app.use(fileUpload({ limits: { fileSize: 50 * 1024 * 1024 } }));
 app.use(globalLimiter);
 
-app.use(session({
-  secret: 'appleskin-onyx-session-secret-2024',
-  resave: false,
-  saveUninitialized: false,
-  name: 'ajax-cookie',
-  cookie: {
-    httpOnly: true,
-    secure: !config.isDev,
-    sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  }
-}));
-
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/auth', authRoutes);
@@ -112,7 +97,6 @@ app.use('/api/user', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/client', downloadRoutes);
 app.use('/api/icon', iconRoutes);
-app.use('/ajax', onyxRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -138,8 +122,14 @@ app.get('/api/icon/user/:userId', authenticate, async (req, res) => {
   }
 });
 
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/setup', (req, res) => res.sendFile(path.join(__dirname, 'public', 'setup.html')));
+
 app.use((req, res) => {
-  if (req.path.startsWith('/api/') || req.path.startsWith('/ajax/')) {
+  if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'Not found.' });
   }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
