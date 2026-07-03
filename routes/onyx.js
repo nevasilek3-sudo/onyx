@@ -42,10 +42,10 @@ router.post('/users/auth/default', async (req, res) => {
     if (!username || !password) return res.json({ authStatus: false, authMessage: 'Username and password required' });
 
     const user = await User.findByUsername(username) || await User.findByEmail(username);
-    if (!user) return res.json({ authStatus: false, authMessage: 'Invalid credentials' });
+    if (!user) return res.json({ authStatus: false, authMessage: 'User not found' });
 
     const valid = await comparePassword(password, user.password_hash);
-    if (!valid) return res.json({ authStatus: false, authMessage: 'Invalid credentials' });
+    if (!valid) return res.json({ authStatus: false, authMessage: 'Wrong password' });
 
     if (user.banned) return res.json({ authStatus: false, authMessage: 'Account is banned' });
 
