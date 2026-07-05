@@ -75,6 +75,7 @@ function handleWsMessage(userId, msg) {
   }
 
   if (msg.type === 'ironman') {
+    console.log(`[WS] IronMan event from ${user.username}: ${msg.action || 'unknown'}`);
     broadcastIronMan(userId, msg);
   }
 }
