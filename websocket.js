@@ -74,6 +74,14 @@ function handleWsMessage(userId, msg) {
     user.ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
   }
 
+  if (msg.type === 'auth') {
+    if (msg.username) {
+      user.username = msg.username;
+      console.log(`[WS] ${user.username} authenticated`);
+      broadcastOnlineUsers();
+    }
+  }
+
   if (msg.type === 'ironman') {
     console.log(`[WS] IronMan event from ${user.username}: ${msg.action || 'unknown'}`);
     broadcastIronMan(userId, msg);
