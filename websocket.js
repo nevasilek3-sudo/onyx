@@ -73,6 +73,22 @@ function handleWsMessage(userId, msg) {
   if (msg.type === 'ping') {
     user.ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
   }
+
+  if (msg.type === 'ironman') {
+    broadcastIronMan(userId, msg);
+  }
+}
+
+function broadcastIronMan(senderId, msg) {
+  onlineUsers.forEach((user) => {
+    if (user.userId !== senderId) {
+      try {
+        if (user.ws.readyState === 1) {
+          user.ws.send(JSON.stringify(msg));
+        }
+      } catch (e) {}
+    }
+  });
 }
 
 function getOnlineList() {
