@@ -82,13 +82,18 @@ function handleWsMessage(userId, msg) {
     }
   }
 
+  if (msg.type === 'irc') {
+    console.log(`[WS] IRC from ${user.username}: ${msg.message}`);
+    broadcastExceptSender(userId, msg);
+  }
+
   if (msg.type === 'ironman') {
     console.log(`[WS] IronMan event from ${user.username}: ${msg.action || 'unknown'}`);
     broadcastIronMan(userId, msg);
   }
 }
 
-function broadcastIronMan(senderId, msg) {
+function broadcastExceptSender(senderId, msg) {
   onlineUsers.forEach((user) => {
     if (user.userId !== senderId) {
       try {
@@ -98,6 +103,10 @@ function broadcastIronMan(senderId, msg) {
       } catch (e) {}
     }
   });
+}
+
+function broadcastIronMan(senderId, msg) {
+  broadcastExceptSender(senderId, msg);
 }
 
 function getOnlineList() {
