@@ -123,7 +123,7 @@ router.post('/users/:id/reset-hwid', async (req, res) => {
 });
 
 router.post('/users/:id/change-role', [
-  body('role').isIn(['user', 'prem-user', 'media', 'admin', 'developer']),
+  body('role').isString().notEmpty(),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -136,7 +136,7 @@ router.post('/users/:id/change-role', [
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    const newRole = req.body.role;
+    const newRole = req.body.role.trim();
 
     if (req.user.role === 'developer' && (newRole === 'admin' || newRole === 'developer')) {
       return res.status(403).json({ error: 'Developers cannot grant admin/developer role.' });

@@ -1,7 +1,5 @@
 const { query } = require('../db');
 
-const ROLES = ['user', 'prem-user', 'media', 'admin', 'developer'];
-
 const User = {
   async create(username, email, passwordHash) {
     const { rows } = await query(
@@ -46,7 +44,6 @@ const User = {
   },
 
   async updateRole(id, role) {
-    if (!ROLES.includes(role)) throw new Error('Invalid role');
     await query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
   },
 
